@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Filtro de Kalman</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Sora:wght@400;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/static/styles.css" />
+    <script defer src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+    <script
+      defer
+      src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"
+      id="MathJax-script"
+    ></script>
+    <script defer src="/static/app.js"></script>
+  </head>
+  <body>
+    <div class="background-blobs" aria-hidden="true">
+      <span></span><span></span><span></span>
+    </div>
+
+    <main class="layout">
+      <header class="hero card reveal">
+        <p class="eyebrow">Tutorial Interactivo</p>
+        <h1>Filtro de Kalman</h1>
+        <p>
+          Define el modelo, ejecuta el filtro con simulaciones o con mediciones offline,
+          y observa paso a paso la evolución de la estimación y la covarianza del error.
+        </p>
+      </header>
+
+      <section class="card reveal stagger-1">
+        <h2>Ecuaciones del modelo y del filtro</h2>
+        <div class="equation-grid">
+          <article>
+            <h3>Modelo del sistema</h3>
+            <p>\[
+              x_{k+1} = A x_k + B u_k + w_k,\quad w_k \sim \mathcal{N}(0,Q)
+            \]</p>
+            <p>\[
+              y_k = C x_k + D u_k + v_k,\quad v_k \sim \mathcal{N}(0,R)
+            \]</p>
+          </article>
+          <article>
+            <h3>Recursión del filtro</h3>
+            <p>\[
+              \hat{x}_{k|k-1} = A\hat{x}_{k-1|k-1} + Bu_{k-1}
+            \]</p>
+            <p>\[
+              P_{k|k-1} = AP_{k-1|k-1}A^T + Q
+            \]</p>
+            <p>\[
+              K_k = P_{k|k-1}C^T(CP_{k|k-1}C^T + R)^{-1}
+            \]</p>
+            <p>\[
+              \hat{x}_{k|k} = \hat{x}_{k|k-1} + K_k(y_k - C\hat{x}_{k|k-1} - Du_k)
+            \]</p>
+            <p>\[
+              P_{k|k} = (I-K_kC)P_{k|k-1}(I-K_kC)^T + K_kRK_k^T
+            \]</p>
+          </article>
+        </div>
+      </section>
+
+      <div class="consent-wrap reveal stagger-2">
+        <label class="consent-row">
+          <input id="continuousConfirm" type="checkbox" />
+          <span>
+            Mi modelo está en tiempo continuo. Mostrar discretización exacta y copiar a
+            \(A\), \(B\) y \(Q\).
+          </span>
+        </label>
+      </div>
+
+      <section id="continuousSection" class="card reveal stagger-2" hidden>
+        <h2>Discretización exacta</h2>
+        <p class="muted">
+          Ingresa las matrices \(A_c, B_c, Q_c\) de tiempo continuo y el periodo de muestreo \(T_s\). La app calculará \(A, B, Q\) de tiempo discreto usando la exponencial de matrices (método exacto de Van Loan).
+        </p>
+        <div class="grid two-cols">
+          <label>
+            <span>\(A_c\)</span>
+            <textarea id="Ac">-2 1
+1 -3</textarea>
+          </label>
+          <label>
+            <span>\(B_c\)</span>
+            <textarea id="Bc">0
+1</textarea>
+          </label>
+          <label>
+            <span>\(Q_c\)</span>
+            <textarea id="Qc">0 0
+0 0.02</textarea>
+          </label>
+          <label>
+            <span>\(T_s\)</span>
+            <input id="dt" type="number" step="0.001" value="0.01" />
+          </label>
+        </div>
+        <button id="discretizeBtn" class="btn btn-secondary">Discretizar modelo continuo</button>
+      </section>
+
+      <section class="card reveal stagger-3">
+        <h2>Modelo discreto y parámetros del filtro</h2>
+        <div class="grid two-cols">
+          <label>
+            <span>\(A\)</span>
+            <textarea id="A">1 0.1
+0 1</textarea>
+          </label>
+          <label>
+            <span>\(B\)</span>
+            <textarea id="B">0.005
+0.1</textarea>
+          </label>
+          <label>
+            <span>\(C\)</span>
+            <textarea id="C">1 0</textarea>
+          </label>
+          <label>
+            <span>\(D\)</span>
+            <textarea id="D">0</textarea>
+          </label>
+          <label>
+            <span>\(Q\)</span>
+            <textarea id="Q">0.001 0
+0 0.003</textarea>
+          </label>
+          <label>
+            <span>\(R\)</span>
+            <textarea id="R">0.05</textarea>
+          </label>
+          <label>
+            <span>\(x_0\) estimado</span>
+            <textarea id="x0">0
+0</textarea>
+          </label>
+          <label>
+            <span>\(P_0\)</span>
+            <textarea id="P0">1 0
+0 1</textarea>
+          </label>
+        </div>
+      </section>
+
+      <section class="card reveal stagger-4">
+        <h2>Fuente de datos</h2>
+        <div class="mode-toggle" role="tablist" aria-label="Modo">
+          <button class="mode-btn active" data-mode="simulation">Simulación con ruido gaussiano</button>
+          <button class="mode-btn" data-mode="offline">Mediciones offline</button>
+        </div>
+
+        <div id="simulationPanel" class="grid two-cols panel-visible">
+          <label>
+            <span>Número de muestras \(N\)</span>
+            <input id="N" type="number" min="2" value="121" />
+          </label>
+          <label>
+            <span>Semilla aleatoria (opcional)</span>
+            <input id="seed" type="number" placeholder="Ej: 37" />
+          </label>
+          <label>
+            <span>\(x_0\) real (opcional)</span>
+            <textarea id="xTrue0">0
+0.5</textarea>
+          </label>
+          <label>
+            <span>\(u[k]\) (\(N \times m\), o \(1 \times m\) para constante)</span>
+            <textarea id="controlsSim">1</textarea>
+          </label>
+        </div>
+
+        <div id="offlinePanel" class="panel-hidden">
+          <label>
+            <span>Mediciones \(y[k]\) \((N \times p)\)</span>
+            <textarea id="measurements" placeholder="Ejemplo p=1: una columna con N filas">0.21
+0.35
+0.51</textarea>
+          </label>
+          <label>
+            <span>Cargar CSV de mediciones</span>
+            <input id="measurementsFile" type="file" accept=".csv,text/csv" />
+          </label>
+          <label>
+            <span>\(u[k]\) (\(N \times m\), opcional)</span>
+            <textarea id="controlsOffline" placeholder="Si se omite, se usa u[k]=0">0</textarea>
+          </label>
+          <small id="offlineInfo" class="muted"></small>
+        </div>
+
+        <button id="runBtn" class="btn btn-primary">Ejecutar filtro de Kalman</button>
+        <p id="status" class="status"></p>
+      </section>
+
+      <section id="resultsSection" class="card reveal stagger-5" hidden>
+        <h2>Resultados</h2>
+        <div class="metrics" id="metrics"></div>
+        <div class="plot" id="statesPlot"></div>
+        <div class="plot" id="outputsPlot"></div>
+        <div class="plot" id="covPlot"></div>
+        <div class="plot" id="innovationPlot"></div>
+
+        <h3>Primeros pasos de la recursión</h3>
+        <div class="table-wrap">
+          <table id="stepsTable">
+            <thead>
+              <tr>
+                <th>\(k\)</th>
+                <th>\(\mathrm{tr}(P_{k|k})\)</th>
+                <th>innovación</th>
+                <th>ganancia \(K_k\)</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <p>
+        &copy; 2024,
+        <a
+          class="footer-link"
+          href="https://isantosruiz.github.io/home/"
+          target="_blank"
+          rel="noopener noreferrer"
+          >Ildeberto de los Santos Ruiz</a
+        >
+      </p>
+    </footer>
+  </body>
+</html>
